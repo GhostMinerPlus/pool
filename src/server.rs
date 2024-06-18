@@ -5,7 +5,6 @@ mod service;
 use std::{io, sync::Arc};
 
 use axum::{
-    body::Body,
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::Response,
@@ -19,22 +18,22 @@ async fn http_upload(
     hm: HeaderMap,
     State(dm): State<Arc<dyn AsDataManager>>,
     Json(ds): Json<service::DataSlice>,
-) -> Response<Body> {
+) -> Response<String> {
     match service::upload(dm.divide(), &hm, ds).await {
         Ok(s) => Response::builder()
             .status(StatusCode::OK)
-            .body(Body::from(s))
+            .body(s)
             .unwrap(),
         Err(e) => {
             log::warn!("when http_execute:\n{e}");
             match e {
                 err::Error::Other(msg) => Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Body::from(msg))
+                    .body(msg)
                     .unwrap(),
                 err::Error::NotLogin(msg) => Response::builder()
                     .status(StatusCode::UNAUTHORIZED)
-                    .body(Body::from(msg))
+                    .body(msg)
                     .unwrap(),
             }
         }
@@ -45,7 +44,7 @@ async fn http_download(
     hm: HeaderMap,
     State(dm): State<Arc<dyn AsDataManager>>,
     Query(fr): Query<service::FileRequest>,
-) -> Response<Body> {
+) -> Response<String> {
     match service::download(dm.divide(), &hm, fr).await {
         Ok(ds) => {
             let start = ds.offset;
@@ -53,21 +52,21 @@ async fn http_download(
             if start == 0 && end == ds.length {
                 Response::builder()
                     .status(StatusCode::OK)
-                    .body(Body::from(ds.slice_value))
+                    .body(ds.slice_value)
                     .unwrap()
             } else if end == ds.length {
                 Response::builder()
                     .header("Content-Length", ds.length)
                     .header("Content-Range", format!("{}-", start + 1))
                     .status(StatusCode::PARTIAL_CONTENT)
-                    .body(Body::from(ds.slice_value))
+                    .body(ds.slice_value)
                     .unwrap()
             } else {
                 Response::builder()
                     .header("Content-Length", ds.length)
                     .header("Range", format!("{}-{}", start + 1, end))
                     .status(StatusCode::PARTIAL_CONTENT)
-                    .body(Body::from(ds.slice_value))
+                    .body(ds.slice_value)
                     .unwrap()
             }
         }
@@ -76,11 +75,11 @@ async fn http_download(
             match e {
                 err::Error::Other(msg) => Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(Body::from(msg))
+                    .body(msg)
                     .unwrap(),
                 err::Error::NotLogin(msg) => Response::builder()
                     .status(StatusCode::UNAUTHORIZED)
-                    .body(Body::from(msg))
+                    .body(msg)
                     .unwrap(),
             }
         }
