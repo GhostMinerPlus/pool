@@ -6,6 +6,7 @@ use std::{
 };
 
 use axum::http::HeaderMap;
+use base64::{decode, encode};
 use edge_lib::{data::AsDataManager, Path};
 use serde::Deserialize;
 
@@ -65,8 +66,9 @@ pub async fn parse_auth(
 pub struct DataSlice {
     pub md5: String,
     pub offset: u64,
-    pub slice_value: Vec<u8>,
+    pub slice_value: String,
     pub length: u64,
+    pub is_base64: bool,
 }
 
 pub async fn upload(
@@ -84,6 +86,13 @@ pub async fn upload(
         return Err(err::Error::Other(format!("out of bound")));
     }
 
+    let arr: Vec<u8>;
+    let slice_value = if ds.is_base64 {
+        arr = decode(ds.slice_value).unwrap();
+        &arr
+    } else {
+        ds.slice_value.as_bytes()
+    };
     let temp_name = format!("{}.temp", ds.md5);
     match fs::File::open(&temp_name) {
         Ok(mut f) => {
@@ -96,10 +105,10 @@ pub async fn upload(
             }
             f.seek(std::io::SeekFrom::Current(ds.offset as i64))
                 .map_err(|e| err::Error::Other(e.to_string()))?;
-            f.write_all(&ds.slice_value)
+            f.write_all(slice_value)
                 .map_err(|e| err::Error::Other(e.to_string()))?;
             drop(f);
-            if ds.offset + ds.slice_value.len() as u64 == ds.length {
+            if ds.offset + slice_value.len() as u64 == ds.length {
                 fs::rename(&temp_name, ds.md5).map_err(|e| err::Error::Other(e.to_string()))?;
             }
             Ok(format!("success"))
@@ -111,10 +120,10 @@ pub async fn upload(
                 if ds.offset > 0 {
                     return Err(err::Error::Other(format!("out of bound")));
                 }
-                f.write_all(&ds.slice_value)
+                f.write_all(slice_value)
                     .map_err(|e| err::Error::Other(e.to_string()))?;
                 drop(f);
-                if ds.offset + ds.slice_value.len() as u64 == ds.length {
+                if ds.offset + slice_value.len() as u64 == ds.length {
                     fs::rename(&temp_name, ds.md5).map_err(|e| err::Error::Other(e.to_string()))?;
                 }
                 Ok(format!("success"))
@@ -172,7 +181,8 @@ pub async fn download(
     Ok(DataSlice {
         md5: fr.md5,
         offset: start,
-        slice_value,
+        is_base64: true,
+        slice_value: encode(slice_value),
         length,
     })
 }
