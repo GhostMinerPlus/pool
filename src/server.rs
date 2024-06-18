@@ -12,14 +12,14 @@ use axum::{
 };
 use edge_lib::{data::AsDataManager, EdgeEngine, ScriptTree};
 
-use crate::err;
+use crate::{err, util::{DataSlice, FileRequest}};
 
-async fn http_upload(
+async fn http_set_data(
     hm: HeaderMap,
     State(dm): State<Arc<dyn AsDataManager>>,
-    Json(ds): Json<service::DataSlice>,
+    Json(ds): Json<DataSlice>,
 ) -> Response<String> {
-    match service::upload(dm.divide(), &hm, ds).await {
+    match service::set_data(dm.divide(), &hm, ds).await {
         Ok(s) => Response::builder()
             .status(StatusCode::OK)
             .body(s)
@@ -40,12 +40,12 @@ async fn http_upload(
     }
 }
 
-async fn http_download(
+async fn http_get_data(
     hm: HeaderMap,
     State(dm): State<Arc<dyn AsDataManager>>,
-    Query(fr): Query<service::FileRequest>,
+    Query(fr): Query<FileRequest>,
 ) -> Response<String> {
-    match service::download(dm.divide(), &hm, fr).await {
+    match service::get_data(dm.divide(), &hm, fr).await {
         Ok(ds) => {
             let start = ds.offset;
             let end = ds.offset + ds.slice_value.len() as u64;
@@ -118,8 +118,8 @@ impl HttpServer {
 
         // build our application with a route
         let app = Router::new()
-            .route(&format!("/{}/upload", name), routing::post(http_upload))
-            .route(&format!("/{}/download", name), routing::get(http_download))
+            .route(&format!("/{}/set", name), routing::post(http_set_data))
+            .route(&format!("/{}/get", name), routing::get(http_get_data))
             .with_state(self.dm.clone());
         // run our app with hyper, listening globally on port 3000
         let address = format!("{}:{}", ip, port);

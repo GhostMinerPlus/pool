@@ -6,11 +6,9 @@ use std::{
 };
 
 use axum::http::HeaderMap;
-use base64::{decode, encode};
 use edge_lib::{data::AsDataManager, Path};
-use serde::Deserialize;
 
-use crate::err;
+use crate::{err, util::{DataSlice, FileRequest}};
 
 use super::crypto;
 
@@ -62,16 +60,7 @@ pub async fn parse_auth(
     crypto::parse_token(&key[0], token)
 }
 
-#[derive(Deserialize)]
-pub struct DataSlice {
-    pub md5: String,
-    pub offset: u64,
-    pub slice_value: String,
-    pub length: u64,
-    pub is_base64: bool,
-}
-
-pub async fn upload(
+pub async fn set_data(
     dm: Arc<dyn AsDataManager>,
     hm: &HeaderMap,
     ds: DataSlice,
@@ -82,24 +71,18 @@ pub async fn upload(
         .map_err(|e| err::Error::NotLogin(e.to_string()))?;
     log::info!("email: {}", auth.email);
 
-    let temp_name = format!("{}.temp", ds.md5);
+    let slice_value = ds.slice_value.as_bytes();
+    let temp_name = format!("{}.temp", ds.key);
     if ds.length == 0 {
-        let _ = fs::remove_file(ds.md5);
+        let _ = fs::remove_file(ds.key);
         let _ =  fs::remove_file(temp_name);
         return Ok(format!("success"));
     }
 
-    if ds.offset + ds.slice_value.len() as u64 > ds.length {
+    if ds.offset + slice_value.len() as u64 > ds.length {
         return Err(err::Error::Other(format!("out of bound")));
     }
 
-    let arr: Vec<u8>;
-    let slice_value = if ds.is_base64 {
-        arr = decode(ds.slice_value).unwrap();
-        &arr
-    } else {
-        ds.slice_value.as_bytes()
-    };
     match fs::File::open(&temp_name) {
         Ok(mut f) => {
             let length = f
@@ -115,7 +98,7 @@ pub async fn upload(
                 .map_err(|e| err::Error::Other(e.to_string()))?;
             drop(f);
             if ds.offset + slice_value.len() as u64 == ds.length {
-                fs::rename(&temp_name, ds.md5).map_err(|e| err::Error::Other(e.to_string()))?;
+                fs::rename(&temp_name, ds.key).map_err(|e| err::Error::Other(e.to_string()))?;
             }
             Ok(format!("success"))
         }
@@ -130,7 +113,7 @@ pub async fn upload(
                     .map_err(|e| err::Error::Other(e.to_string()))?;
                 drop(f);
                 if ds.offset + slice_value.len() as u64 == ds.length {
-                    fs::rename(&temp_name, ds.md5).map_err(|e| err::Error::Other(e.to_string()))?;
+                    fs::rename(&temp_name, ds.key).map_err(|e| err::Error::Other(e.to_string()))?;
                 }
                 Ok(format!("success"))
             }
@@ -139,14 +122,7 @@ pub async fn upload(
     }
 }
 
-#[derive(Deserialize)]
-pub struct FileRequest {
-    md5: String,
-    start: Option<u64>,
-    size: Option<u64>,
-}
-
-pub async fn download(
+pub async fn get_data(
     dm: Arc<dyn AsDataManager>,
     hm: &HeaderMap,
     fr: FileRequest,
@@ -185,10 +161,9 @@ pub async fn download(
     }
 
     Ok(DataSlice {
-        md5: fr.md5,
+        key: fr.md5,
         offset: start,
-        is_base64: true,
-        slice_value: encode(slice_value),
+        slice_value: unsafe { String::from_utf8_unchecked(slice_value) },
         length,
     })
 }
