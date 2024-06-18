@@ -82,6 +82,13 @@ pub async fn upload(
         .map_err(|e| err::Error::NotLogin(e.to_string()))?;
     log::info!("email: {}", auth.email);
 
+    let temp_name = format!("{}.temp", ds.md5);
+    if ds.length == 0 {
+        let _ = fs::remove_file(ds.md5);
+        let _ =  fs::remove_file(temp_name);
+        return Ok(format!("success"));
+    }
+
     if ds.offset + ds.slice_value.len() as u64 > ds.length {
         return Err(err::Error::Other(format!("out of bound")));
     }
@@ -93,7 +100,6 @@ pub async fn upload(
     } else {
         ds.slice_value.as_bytes()
     };
-    let temp_name = format!("{}.temp", ds.md5);
     match fs::File::open(&temp_name) {
         Ok(mut f) => {
             let length = f
