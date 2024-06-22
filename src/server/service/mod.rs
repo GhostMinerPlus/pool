@@ -72,9 +72,10 @@ pub async fn set_data(
     log::info!("email: {}", auth.email);
 
     let slice_value = ds.slice_value.as_bytes();
-    let temp_name = format!("{}.temp", ds.key);
+    let temp_name = format!("files/{}.temp", ds.key);
+    let formal_name = format!("files/{}", ds.key);
     if ds.length == 0 {
-        let _ = fs::remove_file(ds.key);
+        let _ = fs::remove_file(formal_name);
         let _ =  fs::remove_file(temp_name);
         return Ok(format!("success"));
     }
@@ -98,7 +99,7 @@ pub async fn set_data(
                 .map_err(|e| err::Error::Other(e.to_string()))?;
             drop(f);
             if ds.offset + slice_value.len() as u64 == ds.length {
-                fs::rename(&temp_name, ds.key).map_err(|e| err::Error::Other(e.to_string()))?;
+                fs::rename(&temp_name, formal_name).map_err(|e| err::Error::Other(e.to_string()))?;
             }
             Ok(format!("success"))
         }
@@ -113,7 +114,7 @@ pub async fn set_data(
                     .map_err(|e| err::Error::Other(e.to_string()))?;
                 drop(f);
                 if ds.offset + slice_value.len() as u64 == ds.length {
-                    fs::rename(&temp_name, ds.key).map_err(|e| err::Error::Other(e.to_string()))?;
+                    fs::rename(&temp_name, formal_name).map_err(|e| err::Error::Other(e.to_string()))?;
                 }
                 Ok(format!("success"))
             }

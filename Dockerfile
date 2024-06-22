@@ -7,3 +7,5 @@ RUN cargo build --release
 FROM archlinux:latest
 
 COPY --from=builder /root/share/repository/pool/target/release/pool /usr/bin/
+
+WORKDIR /root/share/server/pool
