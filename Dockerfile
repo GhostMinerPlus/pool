@@ -1,4 +1,4 @@
-FROM rust_builder:v0.1.0 as builder
+FROM rust_builder:latest as builder
 
 WORKDIR /root/share/repository/pool
 COPY . .

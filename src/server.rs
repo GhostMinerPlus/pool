@@ -11,8 +11,17 @@ use axum::{
     routing, Json, Router,
 };
 use edge_lib::{data::AsDataManager, EdgeEngine, ScriptTree};
+use serde::{Deserialize, Serialize};
 
-use crate::{err, util::{DataSlice, FileRequest}};
+use crate::err;
+
+#[derive(Deserialize, Serialize)]
+struct DataSlice {
+    key: String,
+    offset: u64,
+    slice_value: String,
+    length: u64,
+}
 
 async fn http_set_data(
     hm: HeaderMap,
@@ -20,12 +29,12 @@ async fn http_set_data(
     Json(ds): Json<DataSlice>,
 ) -> Response<String> {
     match service::set_data(dm.divide(), &hm, ds).await {
-        Ok(s) => Response::builder()
+        Ok(()) => Response::builder()
             .status(StatusCode::OK)
-            .body(s)
+            .body(format!("success"))
             .unwrap(),
         Err(e) => {
-            log::warn!("when http_execute:\n{e}");
+            log::warn!("{e}\nhttp_set_data");
             match e {
                 err::Error::Other(msg) => Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -38,6 +47,13 @@ async fn http_set_data(
             }
         }
     }
+}
+
+#[derive(Deserialize, Serialize)]
+struct FileRequest {
+    key: String,
+    offset: Option<u64>,
+    size: Option<u64>,
 }
 
 async fn http_get_data(
@@ -71,7 +87,35 @@ async fn http_get_data(
             }
         }
         Err(e) => {
-            log::warn!("when http_execute:\n{e}");
+            log::warn!("{e}\nhttp_get_data");
+            match e {
+                err::Error::Other(msg) => Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(msg)
+                    .unwrap(),
+                err::Error::NotLogin(msg) => Response::builder()
+                    .status(StatusCode::UNAUTHORIZED)
+                    .body(msg)
+                    .unwrap(),
+            }
+        }
+    }
+}
+
+async fn http_delete_data(
+    hm: HeaderMap,
+    State(dm): State<Arc<dyn AsDataManager>>,
+    Query(fr): Query<FileRequest>,
+) -> Response<String> {
+    match service::delete_data(dm.divide(), &hm, fr).await {
+        Ok(_) => {
+            Response::builder()
+                    .status(StatusCode::OK)
+                    .body(format!("success"))
+                    .unwrap()
+        }
+        Err(e) => {
+            log::warn!("{e}\nhttp_delete_data");
             match e {
                 err::Error::Other(msg) => Response::builder()
                     .status(StatusCode::INTERNAL_SERVER_ERROR)
@@ -120,6 +164,7 @@ impl HttpServer {
         let app = Router::new()
             .route(&format!("/{}/set", name), routing::post(http_set_data))
             .route(&format!("/{}/get", name), routing::get(http_get_data))
+            .route(&format!("/{}/delete", name), routing::get(http_delete_data))
             .with_state(self.dm.clone());
         // run our app with hyper, listening globally on port 3000
         let address = format!("{}:{}", ip, port);

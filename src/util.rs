@@ -1,22 +1,6 @@
 use std::io;
 
 use edge_lib::ScriptTree;
-use serde::{Deserialize, Serialize};
-
-#[derive(Deserialize, Serialize)]
-pub struct DataSlice {
-    pub key: String,
-    pub offset: u64,
-    pub slice_value: String,
-    pub length: u64,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct FileRequest {
-    pub md5: String,
-    pub start: Option<u64>,
-    pub size: Option<u64>,
-}
 
 pub mod native {
     use pnet::datalink;
