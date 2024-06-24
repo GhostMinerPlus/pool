@@ -41,8 +41,8 @@ pub fn gen_token(key: &str, auth: &Auth) -> io::Result<String> {
 }
 
 pub fn parse_token(key: &str, token_str: &str) -> err::Result<User> {
-    let key: Hmac<Sha512> =
-        Hmac::new_from_slice(&util::hex2byte_v(key)).map_err(|e| err::Error::NotLogin(e.to_string()))?;
+    let key: Hmac<Sha512> = Hmac::new_from_slice(&util::hex2byte_v(key))
+        .map_err(|e| err::Error::NotLogin(e.to_string()))?;
     let token: Token<Header, BTreeMap<String, String>, _> = token_str
         .verify_with_key(&key)
         .map_err(|e| err::Error::NotLogin(e.to_string()))?;

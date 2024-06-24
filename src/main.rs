@@ -1,11 +1,11 @@
 use std::{io, sync::Arc, time::Duration};
 
 use earth::AsConfig;
-use pool::{connector, server};
 use edge_lib::{
     data::{AsDataManager, MemDataManager, RecDataManager},
     EdgeEngine, ScriptTree,
 };
+use pool::{connector, server};
 use serde::{Deserialize, Serialize};
 use tokio::time;
 
